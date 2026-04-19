@@ -3,9 +3,14 @@ import numpy as np
 import joblib
 import shap
 import os
+from pathlib import Path
 
 # Global model cache
 _models_cache = {}
+
+# Get project root (parent of src/)
+PROJECT_ROOT = Path(__file__).parent.parent
+MODELS_DIR = PROJECT_ROOT / "models"
 
 def _load_models():
     """Lazy load models on first use."""
@@ -14,10 +19,15 @@ def _load_models():
     if _models_cache:
         return _models_cache
     
-    required_files = ["models/model1.pkl", "models/model2.pkl", "models/imputer.pkl", 
-                     "models/scaler.pkl", "models/le.pkl"]
+    required_files = [
+        MODELS_DIR / "model1.pkl",
+        MODELS_DIR / "model2.pkl",
+        MODELS_DIR / "imputer.pkl",
+        MODELS_DIR / "scaler.pkl",
+        MODELS_DIR / "le.pkl"
+    ]
     
-    missing = [f for f in required_files if not os.path.exists(f)]
+    missing = [str(f) for f in required_files if not f.exists()]
     if missing:
         raise FileNotFoundError(
             f"Models not found: {missing}\n"
@@ -31,20 +41,18 @@ def _load_models():
         )
     
     _models_cache = {
-        'model1': joblib.load("models/model1.pkl"),
-        'model2': joblib.load("models/model2.pkl"),
-        'imputer': joblib.load("models/imputer.pkl"),
-        'scaler': joblib.load("models/scaler.pkl"),
-        'le': joblib.load("models/le.pkl"),
-        'explainer1': shap.Explainer(joblib.load("models/model1.pkl")),
-        'explainer2': shap.Explainer(joblib.load("models/model2.pkl"))
+        'model1': joblib.load(str(MODELS_DIR / "model1.pkl")),
+        'model2': joblib.load(str(MODELS_DIR / "model2.pkl")),
+        'imputer': joblib.load(str(MODELS_DIR / "imputer.pkl")),
+        'scaler': joblib.load(str(MODELS_DIR / "scaler.pkl")),
+        'le': joblib.load(str(MODELS_DIR / "le.pkl")),
+        'explainer1': shap.Explainer(joblib.load(str(MODELS_DIR / "model1.pkl"))),
+        'explainer2': shap.Explainer(joblib.load(str(MODELS_DIR / "model2.pkl")))
     }
 
     return _models_cache
 
-# =========================
-# FEATURE MEANING MAP
-# =========================
+# FEATURE MEANING MAP 
 feature_meaning = {
     "MMSE": "cognitive score",
     "nWBV": "brain volume",
@@ -57,9 +65,8 @@ feature_meaning = {
     "MMSE_diff": "cognitive decline"
 }
 
-# =========================
+
 # SHAP → TEXT EXPLANATION
-# =========================
 def generate_text_explanation(shap_values, input_df, feature_names, class_idx, top_n=5):
     """Convert SHAP values to human-readable explanations."""
     
@@ -124,15 +131,13 @@ def preprocess(df):
 
     return pd.DataFrame(X, columns=df.columns)
 
-# 🔹 SINGLE PREDICTION WITH SHAP
+#  SINGLE PREDICTION WITH SHAP
 def predict_patient(df):
     models = _load_models()
     X = preprocess(df)
     feature_names = X.columns.tolist()
 
-    # =====================
     # Stage 1: Binary Model
-    # =====================
     prob1 = models['model1'].predict_proba(X)[0]
     pred1 = np.argmax(prob1)
     confidence1 = round(prob1[pred1] * 100, 2)
@@ -152,9 +157,8 @@ def predict_patient(df):
             "other_factors": others
         }
 
-    # =====================
+
     # Stage 2: Multiclass Model
-    # =====================
     prob2 = models['model2'].predict_proba(X)[0]
     pred2 = np.argmax(prob2)
     confidence2 = round(prob2[pred2] * 100, 2)
@@ -173,24 +177,4 @@ def predict_patient(df):
         "top_signals": top,
         "other_factors": others
     }
-
-# 🔹 BATCH PREDICTIONS
-def predict_batch(df):
-    models = _load_models()
-    X = preprocess(df)
-
-    prob1 = models['model1'].predict_proba(X)
-    pred1 = np.argmax(prob1, axis=1)
-
-    prob2 = models['model2'].predict_proba(X)
-    pred2 = np.argmax(prob2, axis=1)
-
-    results = []
-    for i in range(len(df)):
-        if pred1[i] == 0:
-            results.append("Nondemented")
-        else:
-            results.append(models['le'].inverse_transform([pred2[i]])[0])
-
-    return results
 

@@ -21,9 +21,7 @@ def train_and_save(X,X_train, y_train):
 
     X_train_df = pd.DataFrame(X_train, columns=X.columns)
 
-    # =========================
     # MODEL 1 (Binary)
-    # =========================
     y_train_binary = np.where(y_train == "Nondemented", 0, 1)
 
     model1 = XGBClassifier(
@@ -36,9 +34,8 @@ def train_and_save(X,X_train, y_train):
 
     model1.fit(X_train_df, y_train_binary)
 
-    # =========================
+
     # MODEL 2 (Multiclass)
-    # =========================
     le = LabelEncoder()
     y_train_multi = le.fit_transform(y_train)
 
@@ -54,10 +51,8 @@ def train_and_save(X,X_train, y_train):
 
     model2.fit(X_train_df, y_train_multi)
 
-    # =========================
-    # SAVE EVERYTHING
-    # =========================
-    # ===== SAVE MODELS AND PREPROCESSORS =====
+    
+    #SAVE MODELS AND PREPROCESSORS
     joblib.dump(model1, "models/model1.pkl")
     joblib.dump(model2, "models/model2.pkl")
     joblib.dump(imputer, "models/imputer.pkl")
