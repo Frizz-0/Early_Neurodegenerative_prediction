@@ -41,7 +41,13 @@ The model includes SHAP (SHapley Additive exPlanations) integration for full mod
 pip install -r requirements.txt
 ```
 
-### Train Models
+### 1.Train Models
+
+```python
+MODE = "train"   # change to "train" or "inference" or "custom_patient"
+```
+
+then run the main
 
 ```python
 python main.py
@@ -49,7 +55,7 @@ python main.py
 
 Trains and saves XGBoost models to `models/` directory.
 
-### Generate SHAP Analysis
+### 2.Generate SHAP Analysis
 
 ```python
 cd src
@@ -65,12 +71,12 @@ Generates:
 - Feature importance rankings (CSV)
 - Detailed contribution statistics (CSV)
 
-### Run Inference
+### 3.Run Inference
 
 Set `MODE = "inference"` to get predictions with SHAP explanations for sample data.
 
 ```python
-MODE = "inference"   # change to "train" or "inference"
+MODE = "inference"   # change to "train" or "inference" or "custom_patient"
 ```
 
 then run the main
@@ -79,7 +85,34 @@ then run the main
 python main.py
 ```
 
-### Compare ML Models
+### 4.Test custom patient data
+
+```python
+MODE = "custom_patient"   # change to "train" or "inference" or "custom_patient"
+```
+
+fill the patient details , then run
+
+```python
+python main.py
+```
+
+Patient Data example
+
+patient_data = {
+'Visit': 1, # Visit number
+'MR Delay': 0, # Days since last visit (0 for first visit)
+'M/F': 1, # 1=Male, 0=Female
+'Age': 75, # Patient age in years
+'EDUC': 18, # Years of education
+'SES': 2, # Socioeconomic status (1-5)
+'MMSE': 28, # Mini-mental state exam score (0-30)
+'eTIV': 1506.0, # Estimated total intracranial volume
+'nWBV': 0.709, # Normalized whole brain volume
+'ASF': 1.207, # Atlas scaling factor
+}
+
+### 5.Compare ML Models
 
 ```python
 cd src
