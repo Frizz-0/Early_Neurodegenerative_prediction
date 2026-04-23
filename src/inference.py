@@ -8,7 +8,6 @@ from pathlib import Path
 # Global model cache
 _models_cache = {}
 
-# Get project root (parent of src/)
 PROJECT_ROOT = Path(__file__).parent.parent
 MODELS_DIR = PROJECT_ROOT / "models"
 
@@ -66,31 +65,22 @@ feature_meaning = {
 }
 
 
-# SHAP → TEXT EXPLANATION
+# SHAP
 def generate_text_explanation(shap_values, input_df, feature_names, class_idx, top_n=5):
-    """Convert SHAP values to human-readable explanations."""
     
-    # Handle different SHAP value formats
     if isinstance(shap_values, list):
-        # Multiclass: list of arrays
         shap_vals = shap_values[class_idx][0]
     else:
-        # Get the SHAP values - handle both binary and multiclass
         sv = shap_values.values
         
         if len(sv.shape) == 3:
-            # Multiclass format: (n_samples, n_features, n_classes)
             shap_vals = sv[0, :, class_idx]
         elif len(sv.shape) == 2:
-            # Could be (n_samples, n_classes) or (n_samples, n_features)
             if sv.shape[1] == len(feature_names):
-                # (n_samples, n_features) - binary classification
                 shap_vals = sv[0]
             else:
-                # (n_samples, n_classes)
                 shap_vals = sv[0, class_idx]
         else:
-            # (n_samples,) or (n_features,)
             shap_vals = sv[0]
 
     feature_data = []
@@ -113,9 +103,9 @@ def generate_text_explanation(shap_values, input_df, feature_names, class_idx, t
         value = round(f['value'], 2)
 
         if f["impact"] > 0:
-            phrase = "→ higher risk"
+            phrase = "-> higher risk"
         else:
-            phrase = "→ lower risk"
+            phrase = "-> lower risk"
 
         return f"{name} ({value}) {phrase}"
 
@@ -131,7 +121,6 @@ def preprocess(df):
 
     return pd.DataFrame(X, columns=df.columns)
 
-#  SINGLE PREDICTION WITH SHAP
 def predict_patient(df):
     models = _load_models()
     X = preprocess(df)

@@ -12,7 +12,6 @@ import os
 
 def train_and_save(X, X_train, X_test, y_train, y_test):
     
-    # Ensure models and outputs directories exist
     os.makedirs("models", exist_ok=True)
     os.makedirs("outputs", exist_ok=True)
     
@@ -59,8 +58,6 @@ def train_and_save(X, X_train, X_test, y_train, y_test):
     print("\nSTAGE 2: CONVERTED vs NONDEMENTED")
     print("_"*30)
 
-    
-    # Get indices where training labels are not "Demented"
     train_mask = (y_train != "Demented").values
     X_train_stage2 = X_train_df[train_mask].reset_index(drop=True)
     y_train_stage2_raw = y_train[train_mask].reset_index(drop=True)
@@ -68,7 +65,6 @@ def train_and_save(X, X_train, X_test, y_train, y_test):
     # Binary labels: Converted (1) vs Nondemented (0)
     y_train_stage2 = np.where(y_train_stage2_raw == "Converted", 1, 0)
     
-    # For evaluation: get test indices where true labels are not "Demented"
     test_mask = (y_test != "Demented").values
     X_test_stage2 = X_test_df[test_mask].reset_index(drop=True)
     y_test_stage2_raw = y_test[test_mask].reset_index(drop=True)
@@ -91,10 +87,9 @@ def train_and_save(X, X_train, X_test, y_train, y_test):
     X_test_for_stage2 = X_test_df.iloc[indices_for_stage2].reset_index(drop=True)
     y_pred_stage2 = model_stage2.predict(X_test_for_stage2)
     
-    # Get the corresponding true labels for samples where Stage 1 predicted "Not Demented"
     y_test_stage2_true_for_eval = np.where(y_test.iloc[indices_for_stage2] == "Converted", 1, 0)
     
-    # Evaluate Stage 2 (only on samples predicted as non-demented by Stage 1)
+    # Evaluate Stage 2
     if len(y_test_stage2_true_for_eval) > 0:
         evaluate_model(y_test_stage2_true_for_eval, y_pred_stage2, 
                       "Stage 2 (Converted vs Nondemented)", 
@@ -106,10 +101,8 @@ def train_and_save(X, X_train, X_test, y_train, y_test):
 
     final_preds = np.empty(len(X_test_df), dtype=object)
 
-    # Step 1: Assign "Demented" where Stage 1 predicts 1
     final_preds[y_pred_stage1_test == 1] = "Demented"
 
-    # Step 2: For Stage 1 predictions of 0, use Stage 2 predictions
     for i, original_idx in enumerate(indices_for_stage2):
         if y_pred_stage2[i] == 1:
             final_preds[original_idx] = "Converted"
@@ -138,7 +131,7 @@ def train_and_save(X, X_train, X_test, y_train, y_test):
     print(f"\nFinal confusion matrix saved to outputs/")
     plt.close()
 
-    # SAVE MODELS AND PREPROCESSORS
+    # Saving Models and preprocessing
     joblib.dump(model_stage1, "models/model_stage1.pkl")
     joblib.dump(model_stage2, "models/model_stage2.pkl")
     joblib.dump(imputer, "models/imputer.pkl")
