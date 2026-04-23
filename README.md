@@ -44,12 +44,16 @@ pip install -r requirements.txt
 ### Train Models
 
 ```python
-python train_models.py
+python main.py
 ```
 
 Trains and saves XGBoost models to `models/` directory.
 
 ### Generate SHAP Analysis
+
+```python
+cd src
+```
 
 ```python
 python shap_analysis.py
@@ -76,6 +80,10 @@ python main.py
 ```
 
 ### Compare ML Models
+
+```python
+cd src
+```
 
 ```python
 python model_comparison.py
