@@ -19,34 +19,34 @@ def _load_models():
         return _models_cache
     
     required_files = [
-        MODELS_DIR / "model1.pkl",
-        MODELS_DIR / "model2.pkl",
+        MODELS_DIR / "model_stage1.pkl",
+        MODELS_DIR / "model_stage2.pkl",
         MODELS_DIR / "imputer.pkl",
         MODELS_DIR / "scaler.pkl",
-        MODELS_DIR / "le.pkl"
+        MODELS_DIR / "feature_columns.pkl"
     ]
     
     missing = [str(f) for f in required_files if not f.exists()]
     if missing:
         raise FileNotFoundError(
             f"Models not found: {missing}\n"
-            "Please run: python -c \"from src.data_processing import load_and_clean, add_features; "
-            "from src.model_training import train_and_save; "
-            "df = load_and_clean('data/oasis_longitudinal_demographics.xlsx'); "
-            "df = add_features(df); "
-            "X = df.drop(columns=['Group', 'Subject ID']); "
-            "y = df['Group']; "
-            "train_and_save(X, y)\""
+            "Please run training first (e.g. `python main.py` with MODE='train')."
         )
     
+    model_stage1 = joblib.load(str(MODELS_DIR / "model_stage1.pkl"))
+    model_stage2 = joblib.load(str(MODELS_DIR / "model_stage2.pkl"))
+    imputer = joblib.load(str(MODELS_DIR / "imputer.pkl"))
+    scaler = joblib.load(str(MODELS_DIR / "scaler.pkl"))
+    feature_columns = joblib.load(str(MODELS_DIR / "feature_columns.pkl"))
+
     _models_cache = {
-        'model1': joblib.load(str(MODELS_DIR / "model1.pkl")),
-        'model2': joblib.load(str(MODELS_DIR / "model2.pkl")),
-        'imputer': joblib.load(str(MODELS_DIR / "imputer.pkl")),
-        'scaler': joblib.load(str(MODELS_DIR / "scaler.pkl")),
-        'le': joblib.load(str(MODELS_DIR / "le.pkl")),
-        'explainer1': shap.Explainer(joblib.load(str(MODELS_DIR / "model1.pkl"))),
-        'explainer2': shap.Explainer(joblib.load(str(MODELS_DIR / "model2.pkl")))
+        'model_stage1': model_stage1,
+        'model_stage2': model_stage2,
+        'imputer': imputer,
+        'scaler': scaler,
+        'feature_columns': feature_columns,
+        'explainer_stage1': shap.Explainer(model_stage1),
+        'explainer_stage2': shap.Explainer(model_stage2),
     }
 
     return _models_cache
@@ -59,7 +59,7 @@ feature_meaning = {
     "Age": "age",
     "M/F": "gender",
     "Brain_Ratio": "brain-to-skull ratio",
-    "Age_nWBV": "age × brain volume",
+    "Age_nWBV": "age * brain volume",
     "nWBV_diff": "brain volume change",
     "MMSE_diff": "cognitive decline"
 }
@@ -116,6 +116,9 @@ def generate_text_explanation(shap_values, input_df, feature_names, class_idx, t
 
 def preprocess(df):
     models = _load_models()
+    df = df.copy()
+    # Ensure columns order matches training
+    df = df[models["feature_columns"]]
     X = models['imputer'].transform(df)
     X = models['scaler'].transform(X)
 
@@ -126,14 +129,14 @@ def predict_patient(df):
     X = preprocess(df)
     feature_names = X.columns.tolist()
 
-    # Stage 1: Binary Model
-    prob1 = models['model1'].predict_proba(X)[0]
+    # Stage 1: Demented vs Rest (binary)
+    prob1 = models['model_stage1'].predict_proba(X)[0]
     pred1 = np.argmax(prob1)
     confidence1 = round(prob1[pred1] * 100, 2)
 
-    shap_vals1 = models['explainer1'](X)
+    shap_vals1 = models['explainer_stage1'](X)
 
-    # If Nondemented
+    # Training encodes Demented=1, Rest=0
     if pred1 == 0:
         top, others = generate_text_explanation(
             shap_vals1, df, feature_names, class_idx=1
@@ -146,24 +149,20 @@ def predict_patient(df):
             "other_factors": others
         }
 
-
-    # Stage 2: Multiclass Model
-    prob2 = models['model2'].predict_proba(X)[0]
-    pred2 = np.argmax(prob2)
+    # Stage 2: Converted vs Nondemented (binary on non-demented patients)
+    prob2 = models['model_stage2'].predict_proba(X)[0]
+    pred2 = int(np.argmax(prob2))
     confidence2 = round(prob2[pred2] * 100, 2)
 
-    final_label = models['le'].inverse_transform([pred2])[0]
+    final_label = "Converted" if pred2 == 1 else "Nondemented"
 
-    shap_vals2 = models['explainer2'](X)
-
-    top, others = generate_text_explanation(
-        shap_vals2, df, feature_names, class_idx=pred2
-    )
+    shap_vals2 = models['explainer_stage2'](X)
+    top, others = generate_text_explanation(shap_vals2, df, feature_names, class_idx=1)
 
     return {
         "prediction": final_label,
         "confidence": confidence2,
         "top_signals": top,
-        "other_factors": others
+        "other_factors": others,
     }
 

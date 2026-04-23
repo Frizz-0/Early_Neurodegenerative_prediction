@@ -41,6 +41,20 @@ The model includes SHAP (SHapley Additive exPlanations) integration for full mod
 pip install -r requirements.txt
 ```
 
+### Run the UI (recommended)
+
+Launch the Streamlit app:
+
+```python
+python -m streamlit run app.py
+```
+
+This gives you buttons to:
+
+- Train models
+- Run inference on a dataset row
+- Predict a custom patient
+
 ### 1.Train Models
 
 ```python
