@@ -1,5 +1,12 @@
 #!/usr/bin/env python
 
+import sys
+import os
+from pathlib import Path
+
+# Add parent directory to path for imports
+sys.path.insert(0, str(Path(__file__).parent))
+
 import pandas as pd
 import numpy as np
 from sklearn.model_selection import train_test_split
@@ -15,7 +22,7 @@ from xgboost import XGBClassifier
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-from src.data_processing import load_and_clean, add_features
+from data_processing import load_and_clean, add_features
 
 
 def train_and_evaluate_models(X_train, X_test, y_train, y_test):
@@ -158,7 +165,7 @@ def print_summary_table(results):
     summary_df = pd.DataFrame(summary_data)
     
     print("\n" + "="*80)
-    print("📊 MODEL COMPARISON SUMMARY")
+    print("[*] MODEL COMPARISON SUMMARY")
     print("="*80)
     print(summary_df.to_string(index=False))
     print("="*80)
@@ -168,11 +175,11 @@ def print_summary_table(results):
 
 def main():
     print("\n" + "="*80)
-    print("🔬 ML MODEL COMPARISON SUITE")
+    print("[ML] MODEL COMPARISON SUITE")
     print("="*80)
     
     # Load and prepare data
-    print("\n📂 Loading data...")
+    print("\n[*] Loading data...")
     df = load_and_clean("data/oasis_longitudinal_demographics.xlsx")
     df = add_features(df)
     
@@ -188,7 +195,7 @@ def main():
     )
     
     # Preprocess
-    print("\n🔧 Preprocessing...")
+    print("\n[*] Preprocessing...")
     imputer = KNNImputer(n_neighbors=5)
     scaler = StandardScaler()
     
@@ -210,7 +217,7 @@ def main():
     
     # Train and evaluate models
     print("\n" + "="*80)
-    print("🚀 TRAINING MODELS")
+    print("[*] TRAINING MODELS")
     print("="*80)
     
     results = train_and_evaluate_models(
@@ -219,7 +226,7 @@ def main():
     
     # Generate reports
     print("\n" + "="*80)
-    print("📈 GENERATING REPORTS")
+    print("[*] GENERATING REPORTS")
     print("="*80)
     
     # Summary table
@@ -227,19 +234,19 @@ def main():
     
     # Save summary to CSV
     summary_df.to_csv('outputs/model_comparison_summary.csv', index=False)
-    print("\n✅ Summary saved to outputs/model_comparison_summary.csv")
+    print("\n[OK] Summary saved to outputs/model_comparison_summary.csv")
     
     # Confusion matrices
-    print("\n📊 Plotting confusion matrices...")
+    print("\n[*] Plotting confusion matrices...")
     plot_confusion_matrices(results, le.classes_)
     
     # Metrics comparison
-    print("\n📊 Plotting metrics comparison...")
+    print("\n[*] Plotting metrics comparison...")
     plot_metrics_comparison(results)
     
     # Detailed classification reports
     print("\n" + "="*80)
-    print("📋 DETAILED CLASSIFICATION REPORTS")
+    print("[*] DETAILED CLASSIFICATION REPORTS")
     print("="*80)
     
     for name, data in results.items():
@@ -248,19 +255,19 @@ def main():
                                    target_names=le.classes_))
     
     print("\n" + "="*80)
-    print("✅ MODEL COMPARISON COMPLETE")
+    print("[OK] MODEL COMPARISON COMPLETE")
     print("="*80)
-    print("\n📁 Output files saved to outputs/:")
+    print("\n[Output] Output files saved to outputs/:")
     print("   - model_comparison_summary.csv")
     print("   - model_comparison_confusion_matrices.png")
     print("   - model_comparison_metrics.png")
-    print("\n💡 Key Findings:")
+    print("\n[!] Key Findings:")
     
     best_model = max(results.items(), key=lambda x: x[1]['f1'])[0]
     best_recall = max(results.items(), key=lambda x: x[1]['recall'])[0]
     
-    print(f"   • Best F1-Score: {best_model}")
-    print(f"   • Best Recall: {best_recall}")
+    print(f"   - Best F1-Score: {best_model}")
+    print(f"   - Best Recall: {best_recall}")
     print(f"   • XGBoost F1-Score: {results['XGBoost']['f1']:.4f}")
     print(f"   • XGBoost Recall: {results['XGBoost']['recall']:.4f}")
 
