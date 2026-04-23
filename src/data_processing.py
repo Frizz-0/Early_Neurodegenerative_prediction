@@ -33,7 +33,7 @@ def split_data(df):
     y = df["Group"]
 
     print(f"\nData shape: {X.shape}")
-    print(f"Classes: {y.unique()}")
+    print(f"Classes: {", ".join(y.unique())}")
 
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.2, random_state=42, stratify=y

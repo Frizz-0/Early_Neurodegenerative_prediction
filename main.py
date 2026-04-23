@@ -6,7 +6,7 @@ from src.inference import predict_patient
 
 import os
 
-MODE = "train"   # change to "train" or "inference"
+MODE = "inference"   # change to "train" or "inference"
 
 DATA_PATH = "data/oasis_longitudinal_demographics.xlsx"
 
@@ -17,8 +17,8 @@ X,y,X_train, X_test, y_train,y_test = split_data(df)
 
 if MODE == "train":
     print("Training models...")
-    train_and_save(X,X_train, y_train)
-    print("Models trained and saved in /models folder")
+    train_and_save(X, X_train, X_test, y_train, y_test)
+    print("\nModels trained and saved in /models folder")
 
 
 elif MODE == "inference":
