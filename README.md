@@ -37,9 +37,13 @@ The model includes SHAP (SHapley Additive exPlanations) integration for full mod
 
 ## Quick Start
 
+```python
+pip install -r requirements.txt
+```
+
 ### Train Models
 
-```bash
+```python
 python train_models.py
 ```
 
@@ -47,7 +51,7 @@ Trains and saves XGBoost models to `models/` directory.
 
 ### Generate SHAP Analysis
 
-```bash
+```python
 python shap_analysis.py
 ```
 
@@ -59,15 +63,19 @@ Generates:
 
 ### Run Inference
 
-```bash
+Set `MODE = "inference"` to get predictions with SHAP explanations for sample data.
+
+```python
+MODE = "inference"   # change to "train" or "inference"
+```
+
+```python
 python main.py
 ```
 
-Set `MODE = "inference"` to get predictions with SHAP explanations for sample data.
-
 ### Compare ML Models
 
-```bash
+```python
 python model_comparison.py
 ```
 
