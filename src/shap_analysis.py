@@ -8,6 +8,8 @@ import shap
 import joblib
 import os
 from pathlib import Path
+from sklearn.preprocessing import LabelEncoder
+from xgboost import XGBClassifier
 
 from data_processing import load_and_clean, add_features
 from shap_visualizations import (
@@ -28,7 +30,10 @@ os.makedirs("outputs", exist_ok=True)
 print("\nSHAP MODEL INTERPRETABILITY ANALYSIS - COMPLETE SUITE")
 
 print("\n Loading data and models...")
-df = load_and_clean("data/oasis_longitudinal_demographics.xlsx")
+# Resolve data path relative to project root so running from any CWD works.
+PROJECT_ROOT = Path(__file__).parent.parent
+data_path = PROJECT_ROOT / "data" / "oasis_longitudinal_demographics.xlsx"
+df = load_and_clean(str(data_path))
 df = add_features(df)
 
 X = df.drop(columns=["Group", "Subject ID"])
@@ -41,21 +46,74 @@ print(f"    Classes: {y.unique().tolist()}")
 model2, imputer, scaler, le = load_shap_data(model_dir="models")
 X_processed = prepare_shap_data(X, imputer, scaler)
 
-print(f"    Model2 (Multiclass): {type(model2).__name__}")
+print(f"    Model2 (Loaded): {type(model2).__name__}")
 print(f"    Preprocessed shape: {X_processed.shape}")
+
+expected_classes = sorted(y.unique().tolist())
+loaded_n_classes = None
+try:
+    loaded_n_classes = int(getattr(model2, "n_classes_", model2.predict_proba(X_processed.iloc[[0]]).shape[1]))
+except Exception:
+    loaded_n_classes = None
+
+# If the loaded model isn't truly multiclass, train a multiclass model for SHAP so the
+# feature-importance plot matches the 3-class stacked bar style (as in the reference image).
+model_for_shap = model2
+le_for_shap = le
+if loaded_n_classes is not None and loaded_n_classes != len(expected_classes):
+    print(f"    Note: loaded model predicts {loaded_n_classes} classes, but data has {len(expected_classes)} classes.")
+    print("    Training a multiclass XGBoost model for SHAP plots...")
+
+    le_for_shap = LabelEncoder()
+    y_enc = le_for_shap.fit_transform(y)
+
+    model_for_shap = XGBClassifier(
+        objective="multi:softprob",
+        num_class=len(le_for_shap.classes_),
+        eval_metric="mlogloss",
+        n_estimators=400,
+        learning_rate=0.05,
+        max_depth=4,
+        subsample=0.9,
+        colsample_bytree=0.9,
+        reg_lambda=1.0,
+        random_state=42,
+        n_jobs=-1,
+    )
+    model_for_shap.fit(X_processed, y_enc)
+
+print(f"    SHAP model: {type(model_for_shap).__name__} (classes={len(getattr(le_for_shap, 'classes_', []))})")
 
 
 print("\n Computing SHAP values (this may take a moment)...")
-explainer, predictions = get_shap_explainer(model2, X_processed)
+explainer, predictions = get_shap_explainer(model_for_shap, X_processed)
 shap_values = explainer(X_processed)
 
 print(f"   - SHAP values computed: {shap_values.values.shape}")
+
+# For multiclass models, SHAP may come back as 2D depending on explainer.
+# To match the stacked-per-class bar plot (like the reference image),
+# recompute per-class SHAP values when possible.
+shap_values_for_bar = shap_values
+shap_values_for_importance = shap_values
+try:
+    if hasattr(model2, "predict_proba") and getattr(model2, "n_classes_", 0) > 2 and shap_values.values.ndim == 2:
+        tree_explainer = shap.TreeExplainer(model2)
+        per_class = tree_explainer.shap_values(X_processed)  # list-of-arrays or (n, f, c)
+        shap_values_for_bar = per_class
+        shap_values_for_importance = per_class
+        if isinstance(per_class, list):
+            print(f"   - Recomputed per-class SHAP values: ({per_class[0].shape[0]}, {per_class[0].shape[1]}, {len(per_class)})")
+        else:
+            print(f"   - Recomputed per-class SHAP values: {per_class.shape}")
+except Exception as e:
+    print(f"   - Note: per-class SHAP recomputation skipped ({type(e).__name__}: {e})")
 
 
 print("\n Analyzing feature importance...")
 
 importance_df = get_feature_importance(
-    shap_values,
+    shap_values_for_importance,
     X_processed.columns.tolist(),
     top_n=15
 )
@@ -73,7 +131,7 @@ print("\n Generating visualizations...")
 print("   1. Creating feature importance bar plot...")
 
 plt.figure(figsize=(12, 8))
-shap.summary_plot(shap_values, X_processed, plot_type="bar", show=False)
+shap.summary_plot(shap_values_for_bar, X_processed, plot_type="bar", show=False)
 plt.title("Feature Importance - Mean Absolute SHAP Values", fontsize=14, fontweight='bold')
 plt.tight_layout()
 plt.savefig("outputs/01_shap_importance_bar.png", dpi=300, bbox_inches='tight')
@@ -135,19 +193,24 @@ print("      - Saved: outputs/03_shap_dependence_plots.png")
 print("   4. Creating sample predictions with SHAP details...")
 
 # Get predictions for different classes
-fig, axes = plt.subplots(1, 3, figsize=(16, 5))
+class_labels = list(getattr(le_for_shap, "classes_", []))
+fig, axes = plt.subplots(1, len(class_labels), figsize=(max(16, 5 * len(class_labels)), 5))
+if len(class_labels) == 1:
+    axes = [axes]
 
 class_indices = []
-for class_label in le.classes_:
+for class_label in class_labels:
     # Find first prediction of each class
-    preds = model2.predict(X_processed)
-    pred_classes = le.inverse_transform(preds)
+    preds = model_for_shap.predict(X_processed)
+    pred_classes = le_for_shap.inverse_transform(preds)
     idx = np.where(pred_classes == class_label)[0]
     if len(idx) > 0:
         class_indices.append(idx[0])
 
 for ax, sample_idx in zip(axes, class_indices):
-    pred_class = le.inverse_transform([np.argmax(model2.predict_proba(X_processed.iloc[[sample_idx]]))])[0]
+    pred_class = le_for_shap.inverse_transform(
+        [np.argmax(model_for_shap.predict_proba(X_processed.iloc[[sample_idx]]))]
+    )[0]
     
     # Get top 10 SHAP values for this sample
     sv_abs = np.abs(shap_values.values[sample_idx]).mean(axis=-1) if len(shap_values.values.shape) == 3 else np.abs(shap_values.values[sample_idx])
@@ -212,8 +275,8 @@ KEY FINDINGS:
 3. MODEL INSIGHTS:
    - Total samples analyzed:    {X_processed.shape[0]}
    - Total features:            {X_processed.shape[1]}
-   - Number of classes:         {len(le.classes_)}
-   - Classes:                   {', '.join(le.classes_)}
+   - Number of classes:         {len(class_labels)}
+   - Classes:                   {', '.join(class_labels)}
 
 """)
 

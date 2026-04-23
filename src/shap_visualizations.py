@@ -87,8 +87,16 @@ def plot_waterfall_plot(explainer, shap_values, X_processed, sample_idx=0):
 
 def get_feature_importance(shap_values, feature_names, top_n=10):
    
-    
-    sv = shap_values.values
+    # Accept SHAP as Explanation, ndarray, or list-of-arrays (multiclass TreeExplainer)
+    if hasattr(shap_values, "values"):
+        sv = shap_values.values
+    else:
+        sv = shap_values
+
+    if isinstance(sv, list):
+        # List of (n_samples, n_features) per class -> (n_samples, n_features, n_classes)
+        sv = np.stack(sv, axis=-1)
+
     if len(sv.shape) == 3:
         # Multiclass: (n_samples, n_features, n_classes)
         # Take mean absolute value across all samples and classes
@@ -108,7 +116,14 @@ def get_feature_importance(shap_values, feature_names, top_n=10):
 def analyze_feature_contribution(explainer, shap_values, X_processed, feature_name):
    
     feature_idx = X_processed.columns.tolist().index(feature_name)
-    sv = shap_values.values
+    # Accept SHAP as Explanation, ndarray, or list-of-arrays (multiclass TreeExplainer)
+    if hasattr(shap_values, "values"):
+        sv = shap_values.values
+    else:
+        sv = shap_values
+
+    if isinstance(sv, list):
+        sv = np.stack(sv, axis=-1)
     
     if len(sv.shape) == 3:
         # Multiclass: (n_samples, n_features, n_classes)

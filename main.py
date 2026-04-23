@@ -7,7 +7,7 @@ from src.inference import predict_patient
 import os
 import pandas as pd
 
-MODE = "inference"   # change to "train", "inference", or "custom_patient"
+MODE = "train"   # change to "train", "inference", or "custom_patient"
 
 DATA_PATH = "data/oasis_longitudinal_demographics.xlsx"
 
