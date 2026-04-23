@@ -69,6 +69,8 @@ Set `MODE = "inference"` to get predictions with SHAP explanations for sample da
 MODE = "inference"   # change to "train" or "inference"
 ```
 
+then run the main
+
 ```python
 python main.py
 ```
