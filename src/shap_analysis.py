@@ -9,8 +9,8 @@ import joblib
 import os
 from pathlib import Path
 
-from src.data_processing import load_and_clean, add_features
-from src.shap_visualizations import (
+from data_processing import load_and_clean, add_features
+from shap_visualizations import (
     load_shap_data,
     prepare_shap_data,
     get_shap_explainer,
@@ -63,7 +63,7 @@ importance_df = get_feature_importance(
 print("\n   Top 15 Features by Importance:")
 print("   " + "-" * 50)
 for idx, row in importance_df.iterrows():
-    print(f"   {idx+1:2d}. {row['feature']:15s} → {row['importance']:.4f}")
+    print(f"   {idx+1:2d}. {row['feature']:15s} -> {row['importance']:.4f}")
 
 # Save to CSV
 importance_df.to_csv("outputs/shap_feature_importance.csv", index=False)
@@ -87,8 +87,12 @@ top_4_features = importance_df.head(4)['feature'].tolist()
 print("   2. Creating SHAP values beeswarm plot...")
 
 plt.figure(figsize=(14, 10))
-# For multiclass, we need to sum SHAP values across classes
-shap_values_summed = np.abs(shap_values.values).mean(axis=2)  # Average across classes
+# SHAP can be either 2D (n_samples, n_features) or 3D (n_samples, n_features, n_classes)
+sv = shap_values.values
+if sv.ndim == 3:
+    shap_values_summed = np.abs(sv).mean(axis=2)  # Average across classes
+else:
+    shap_values_summed = sv
 shap.summary_plot(
     shap.Explanation(values=shap_values_summed, base_values=np.mean(shap_values_summed),
                     data=X_processed.values, feature_names=X_processed.columns.tolist()),
@@ -104,8 +108,11 @@ print("      - Saved: outputs/02_shap_values_distribution.png")
 
 print("   3. Creating dependence plots for top 4 features...")
 
-# For multiclass, average SHAP values across classes
-shap_values_mean = np.mean(np.abs(shap_values.values), axis=2)
+# For multiclass, average SHAP values across classes; otherwise just use absolute SHAP values
+if sv.ndim == 3:
+    shap_values_mean = np.abs(sv).mean(axis=2)
+else:
+    shap_values_mean = np.abs(sv)
 shap_values_mean_df = pd.DataFrame(shap_values_mean, columns=X_processed.columns)
 
 fig, axes = plt.subplots(2, 2, figsize=(14, 10))
@@ -198,15 +205,15 @@ KEY FINDINGS:
                   for i, (_, row) in enumerate(importance_df.head(5).iterrows())])}
 
 2. FEATURE IMPACT INTERPRETATION:
-   • Positive SHAP values  - Increase prediction likelihood
-   • Negative SHAP values  - Decrease prediction likelihood
-   • Larger magnitude      - Stronger influence on prediction
+   - Positive SHAP values  - Increase prediction likelihood
+   - Negative SHAP values  - Decrease prediction likelihood
+   - Larger magnitude      - Stronger influence on prediction
 
 3. MODEL INSIGHTS:
-   • Total samples analyzed:    {X_processed.shape[0]}
-   • Total features:            {X_processed.shape[1]}
-   • Number of classes:         {len(le.classes_)}
-   • Classes:                   {', '.join(le.classes_)}
+   - Total samples analyzed:    {X_processed.shape[0]}
+   - Total features:            {X_processed.shape[1]}
+   - Number of classes:         {len(le.classes_)}
+   - Classes:                   {', '.join(le.classes_)}
 
 """)
 

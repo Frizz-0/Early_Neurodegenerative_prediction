@@ -1,6 +1,4 @@
-"""
-SHAP visualization functions for model interpretability
-"""
+
 import shap
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -13,24 +11,26 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).parent.parent
 
 def load_shap_data(model_dir="models"):
-    """Load models and preprocessed data for SHAP analysis.
     
-    Args:
-        model_dir: Path to models directory (default: 'models')
-    """
     # Convert to absolute path if relative
     if not os.path.isabs(model_dir):
         model_dir = PROJECT_ROOT / model_dir
     else:
         model_dir = Path(model_dir)
     
-    # Check if files exist
-    required_files = [model_dir / f for f in ["model2.pkl", "imputer.pkl", "scaler.pkl", "le.pkl"]]
+    # Allow either legacy names (model2.pkl) or stage naming (model_stage2.pkl)
+    model2_path = model_dir / "model2.pkl"
+    if not model2_path.exists():
+        stage2_path = model_dir / "model_stage2.pkl"
+        if stage2_path.exists():
+            model2_path = stage2_path
+
+    required_files = [model2_path, model_dir / "imputer.pkl", model_dir / "scaler.pkl", model_dir / "le.pkl"]
     missing = [str(f) for f in required_files if not f.exists()]
     if missing:
         raise FileNotFoundError(f"Missing model files: {missing}")
     
-    model2 = joblib.load(str(model_dir / "model2.pkl"))
+    model2 = joblib.load(str(model2_path))
     imputer = joblib.load(str(model_dir / "imputer.pkl"))
     scaler = joblib.load(str(model_dir / "scaler.pkl"))
     le = joblib.load(str(model_dir / "le.pkl"))
@@ -61,7 +61,7 @@ def plot_force_plot(explainer, shap_values, X_processed, sample_idx=0):
 
 
 def plot_summary_plot(explainer, shap_values, X_processed, plot_type="bar"):
-    """Plot SHAP summary plot."""
+
     if plot_type == "bar":
         shap.summary_plot(shap_values, X_processed, plot_type="bar")
     else:
@@ -70,13 +70,11 @@ def plot_summary_plot(explainer, shap_values, X_processed, plot_type="bar"):
 
 
 def plot_dependence_plot(explainer, shap_values, X_processed, feature_name):
-    """Plot SHAP dependence plot for a specific feature."""
     shap.dependence_plot(feature_name, shap_values.values, X_processed)
     plt.tight_layout()
 
 
 def plot_waterfall_plot(explainer, shap_values, X_processed, sample_idx=0):
-    """Plot SHAP waterfall plot for a single sample."""
     return shap.plots.waterfall(
         shap.Explanation(
             values=shap_values.values[sample_idx],
@@ -88,14 +86,8 @@ def plot_waterfall_plot(explainer, shap_values, X_processed, sample_idx=0):
 
 
 def get_feature_importance(shap_values, feature_names, top_n=10):
-    """Extract top N important features based on mean absolute SHAP values.
+   
     
-    Args:
-        shap_values: SHAP values (Explanation object)
-        feature_names: List of feature names
-        top_n: Number of top features to return
-    """
-    # Handle multiclass (3D) SHAP values by taking mean across classes
     sv = shap_values.values
     if len(sv.shape) == 3:
         # Multiclass: (n_samples, n_features, n_classes)
@@ -114,18 +106,10 @@ def get_feature_importance(shap_values, feature_names, top_n=10):
 
 
 def analyze_feature_contribution(explainer, shap_values, X_processed, feature_name):
-    """Get statistics about a feature's contribution to predictions.
-    
-    Args:
-        explainer: SHAP explainer object
-        shap_values: SHAP values (Explanation object)
-        X_processed: Processed feature data
-        feature_name: Name of feature to analyze
-    """
+   
     feature_idx = X_processed.columns.tolist().index(feature_name)
     sv = shap_values.values
     
-    # Handle multiclass (3D) SHAP values by taking mean across classes
     if len(sv.shape) == 3:
         # Multiclass: (n_samples, n_features, n_classes)
         # Take mean across classes for each sample
